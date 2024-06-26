@@ -6,6 +6,7 @@ import axios from "axios";
 export default function Home() {
   const [prompt, setPrompt] = useState("");
   const [imageData, setImageData] = useState(null);
+  const [ipfsUri, setIpfsUri] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleGenerateImage = async () => {
@@ -14,6 +15,7 @@ export default function Home() {
     try {
       const response = await axios.post("/api/generateImage", { prompt });
       setImageData(response.data.image);
+      setIpfsUri(response.data.uri);
     } catch (error) {
       console.error("Error generating image:", error);
     } finally {
@@ -42,6 +44,12 @@ export default function Home() {
       {imageData && (
         <div className="mt-8">
           <img src={`data:image/jpeg;base64,${imageData}`} alt="Generated" />
+          <p>
+            IPFS URI:{" "}
+            <a href={ipfsUri} target="_blank" rel="noopener noreferrer">
+              {ipfsUri}
+            </a>
+          </p>
         </div>
       )}
     </main>

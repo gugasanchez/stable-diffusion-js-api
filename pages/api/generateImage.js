@@ -1,6 +1,9 @@
+const FormData = require('form-data');
 const axios = require('axios');
 
 const api_key = process.env.NEXT_PUBLIC_SEGMIND_API_KEY;
+const JWT = process.env.NEXT_PUBLIC_PINATA_API_KEY;
+
 const url = "https://api.segmind.com/v1/sdxl1.0-newreality-lightning";
 
 async function generateImage(prompt) {
@@ -19,7 +22,7 @@ async function generateImage(prompt) {
 
     try {
         const response = await axios.post(url, data, { headers: { 'x-api-key': api_key } });
-        console.log('API response:', response.data); // Adiciona mais logs
+        console.log('API response:', response.data);
         if (response.status === 200 && response.data.status === 'Success') {
             return response.data.image; // Retorna a string base64 da imagem
         } else {
@@ -27,7 +30,38 @@ async function generateImage(prompt) {
         }
     } catch (error) {
         console.error('Error generating image:', error.response ? error.response.data : error.message);
-        throw error; // Re-lança o erro para ser tratado pelo chamador
+        throw error;
+    }
+}
+
+async function uploadToIPFS(base64Image) {
+    const formData = new FormData();
+    const buffer = Buffer.from(base64Image, 'base64');
+    formData.append('file', buffer, 'image.png');
+
+    const pinataMetadata = JSON.stringify({
+        name: 'Generated Image',
+    });
+    formData.append('pinataMetadata', pinataMetadata);
+
+    const pinataOptions = JSON.stringify({
+        cidVersion: 0,
+    });
+    formData.append('pinataOptions', pinataOptions);
+
+    try {
+        const res = await axios.post("https://api.pinata.cloud/pinning/pinFileToIPFS", formData, {
+            maxBodyLength: "Infinity",
+            headers: {
+                'Content-Type': `multipart/form-data; boundary=${formData._boundary}`,
+                'Authorization': `Bearer ${JWT}`
+            }
+        });
+        console.log(res.data);
+        return `https://gateway.pinata.cloud/ipfs/${res.data.IpfsHash}`;
+    } catch (error) {
+        console.error('Error uploading to IPFS with Pinata:', error);
+        throw error;
     }
 }
 
@@ -40,7 +74,8 @@ export default async function handler(req, res) {
 
     try {
         const imageBase64 = await generateImage(prompt);
-        res.status(200).json({ image: imageBase64 });
+        const ipfsUri = await uploadToIPFS(imageBase64);
+        res.status(200).json({ image: imageBase64, uri: ipfsUri });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
