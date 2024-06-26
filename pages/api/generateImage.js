@@ -65,6 +65,33 @@ async function uploadToIPFS(base64Image) {
     }
 }
 
+function createJsonAndConvertToHex(prompt, ipfsUri) {
+    const json = {
+        prompt: prompt,
+        uri: ipfsUri,
+        timestamp: new Date().toISOString(),
+        creator: "creator_identifier", // Substituir por um identificador real depois, quando estiver integrado com Particle
+        parameters: {
+            negative_prompt: "((close up)),(octane render, render, drawing, bad photo, bad photography:1.3), (worst quality, low quality, blurry:1.2), (bad teeth, deformed teeth, deformed lips), (bad anatomy, bad proportions:1.1), (deformed iris, deformed pupils), (deformed eyes, bad eyes), (deformed face, ugly face, bad face), (deformed hands, bad hands, fused fingers), morbid, mutilated, mutation, disfigured",
+            samples: 1,
+            scheduler: "DPM++ SDE",
+            num_inference_steps: 7,
+            guidance_scale: 1,
+            seed: 1220429729,
+            img_width: 1024,
+            img_height: 1024
+        },
+        tool: {
+            name: "Segmind API",
+            version: "v1",
+            model: "sdxl1.0-newreality-lightning"
+        }
+    };
+    const jsonString = JSON.stringify(json);
+    const hex = Buffer.from(jsonString).toString('hex');
+    return { json, hex };
+}
+
 export default async function handler(req, res) {
     const { prompt } = req.body;
 
@@ -75,7 +102,8 @@ export default async function handler(req, res) {
     try {
         const imageBase64 = await generateImage(prompt);
         const ipfsUri = await uploadToIPFS(imageBase64);
-        res.status(200).json({ image: imageBase64, uri: ipfsUri });
+        const { json, hex } = createJsonAndConvertToHex(prompt, ipfsUri);
+        res.status(200).json({ image: imageBase64, uri: ipfsUri, json, hex });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
